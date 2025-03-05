@@ -18,6 +18,7 @@ import Privacy from "./pages/Privacy";
 import Cookies from "./pages/Cookies";
 import Legal from "./pages/Legal";
 import Help from "./pages/Help";
+import Rides from "./pages/Rides";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/search" element={<Search />} />
             <Route path="/offer" element={<Offer />} />
+            <Route path="/rides" element={<Rides />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />

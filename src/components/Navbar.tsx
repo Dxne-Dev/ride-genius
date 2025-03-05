@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { X, Menu, Car, User, Search, MapPin, LogOut } from 'lucide-react';
+import { X, Menu, Car, User, Search, MapPin, LogOut, Ticket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
@@ -28,11 +28,20 @@ const Navbar: React.FC = () => {
     setIsOpen(false);
   }, [location]);
 
-  const navLinks = [
+  // Liens de navigation pour tous les utilisateurs
+  const publicNavLinks = [
     { name: "Rechercher", path: "/search", icon: <Search className="mr-2 h-4 w-4" /> },
-    { name: "Proposer", path: "/offer", icon: <Car className="mr-2 h-4 w-4" /> },
     { name: "Comment ça marche", path: "/how-it-works", icon: <MapPin className="mr-2 h-4 w-4" /> },
   ];
+  
+  // Liens supplémentaires pour les utilisateurs connectés
+  const authNavLinks = [
+    { name: "Proposer", path: "/offer", icon: <Car className="mr-2 h-4 w-4" /> },
+    { name: "Mes trajets", path: "/rides", icon: <Ticket className="mr-2 h-4 w-4" /> },
+  ];
+  
+  // Liens à afficher en fonction de l'état de connexion
+  const navLinks = user ? [...publicNavLinks, ...authNavLinks] : publicNavLinks;
 
   const handleSignOut = async () => {
     await signOut();

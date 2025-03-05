@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import SearchForm, { SearchData } from '@/components/search/SearchForm';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,8 @@ import { Slider } from '@/components/ui/slider';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CarFront, Clock, MapPin, CreditCard, Star, Filter } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 
 interface RideResult {
   id: string;
@@ -37,6 +40,9 @@ const Search = () => {
   const [searchParams, setSearchParams] = useState<SearchData | null>(null);
   const [priceRange, setPriceRange] = useState([0, 100]);
   const [showFilters, setShowFilters] = useState(false);
+  const [filteredResults, setFilteredResults] = useState<RideResult[]>([]);
+  const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Mock data for demonstration
   const mockResults: RideResult[] = [
@@ -108,10 +114,45 @@ const Search = () => {
     }
   ];
   
+  // Apply filters whenever search parameters or price range changes
+  useEffect(() => {
+    if (!searchParams) {
+      setFilteredResults([]);
+      return;
+    }
+    
+    // Filter rides based on search criteria and price range
+    const results = mockResults.filter(ride => {
+      // Match departure and destination cities (case insensitive)
+      const departureMatch = ride.departure.city.toLowerCase().includes(searchParams.departure.toLowerCase());
+      const destinationMatch = ride.destination.city.toLowerCase().includes(searchParams.destination.toLowerCase());
+      
+      // Match price range
+      const priceMatch = ride.price >= priceRange[0] && ride.price <= priceRange[1];
+      
+      // Check if ride has enough seats
+      const seatsMatch = ride.seats >= searchParams.passengers;
+      
+      return departureMatch && destinationMatch && priceMatch && seatsMatch;
+    });
+    
+    setFilteredResults(results);
+  }, [searchParams, priceRange]);
+  
   const handleSearch = (data: SearchData) => {
     setSearchParams(data);
     console.log('Search data:', data);
-    // Here you would typically fetch results from API
+  };
+  
+  const handleReservation = (rideId: string) => {
+    if (!user) {
+      toast.error('Veuillez vous connecter pour réserver un trajet');
+      navigate('/login');
+      return;
+    }
+    
+    toast.success('Réservation en cours de traitement...');
+    // Here you would typically handle the actual reservation process
   };
   
   return (
@@ -254,82 +295,96 @@ const Search = () => {
                   </p>
                 </div>
                 
-                <div className="space-y-4">
-                  {mockResults.map((ride) => (
-                    <Card key={ride.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                      <CardContent className="p-0">
-                        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {/* Time and Route */}
-                          <div className="flex items-start space-x-4">
-                            <div className="text-center">
-                              <div className="text-lg font-semibold">{ride.departure.time}</div>
-                              <div className="h-14 w-px bg-border mx-auto my-1"></div>
-                              <div className="text-lg font-semibold">{ride.destination.time}</div>
-                            </div>
-                            
-                            <div>
-                              <div className="mb-4">
-                                <div className="font-semibold">{ride.departure.city}</div>
-                                <div className="text-sm text-muted-foreground flex items-center">
-                                  <MapPin className="mr-1 h-3 w-3" />
-                                  Point de rendez-vous
-                                </div>
+                {filteredResults.length > 0 ? (
+                  <div className="space-y-4">
+                    {filteredResults.map((ride) => (
+                      <Card key={ride.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                        <CardContent className="p-0">
+                          <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Time and Route */}
+                            <div className="flex items-start space-x-4">
+                              <div className="text-center">
+                                <div className="text-lg font-semibold">{ride.departure.time}</div>
+                                <div className="h-14 w-px bg-border mx-auto my-1"></div>
+                                <div className="text-lg font-semibold">{ride.destination.time}</div>
                               </div>
                               
                               <div>
-                                <div className="font-semibold">{ride.destination.city}</div>
-                                <div className="text-sm text-muted-foreground flex items-center">
-                                  <MapPin className="mr-1 h-3 w-3" />
-                                  Point d'arrivée
+                                <div className="mb-4">
+                                  <div className="font-semibold">{ride.departure.city}</div>
+                                  <div className="text-sm text-muted-foreground flex items-center">
+                                    <MapPin className="mr-1 h-3 w-3" />
+                                    Point de rendez-vous
+                                  </div>
+                                </div>
+                                
+                                <div>
+                                  <div className="font-semibold">{ride.destination.city}</div>
+                                  <div className="text-sm text-muted-foreground flex items-center">
+                                    <MapPin className="mr-1 h-3 w-3" />
+                                    Point d'arrivée
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                          
-                          {/* Driver info */}
-                          <div className="flex items-center space-x-4">
-                            <img 
-                              src={ride.driver.avatar} 
-                              alt={ride.driver.name} 
-                              className="h-12 w-12 rounded-full object-cover"
-                            />
                             
-                            <div>
-                              <div className="font-medium">{ride.driver.name}</div>
-                              <div className="flex items-center text-sm">
-                                <Star className="h-3 w-3 text-yellow-400 fill-yellow-400 mr-1" />
-                                <span>{ride.driver.rating}</span>
-                              </div>
-                              <div className="text-xs text-muted-foreground flex items-center">
-                                <CarFront className="mr-1 h-3 w-3" />
-                                {ride.car}
+                            {/* Driver info */}
+                            <div className="flex items-center space-x-4">
+                              <img 
+                                src={ride.driver.avatar} 
+                                alt={ride.driver.name} 
+                                className="h-12 w-12 rounded-full object-cover"
+                              />
+                              
+                              <div>
+                                <div className="font-medium">{ride.driver.name}</div>
+                                <div className="flex items-center text-sm">
+                                  <Star className="h-3 w-3 text-yellow-400 fill-yellow-400 mr-1" />
+                                  <span>{ride.driver.rating}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground flex items-center">
+                                  <CarFront className="mr-1 h-3 w-3" />
+                                  {ride.car}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          
-                          {/* Price and details */}
-                          <div className="flex flex-col justify-between">
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm flex items-center">
-                                <Clock className="mr-1 h-4 w-4" />
-                                {ride.duration}
+                            
+                            {/* Price and details */}
+                            <div className="flex flex-col justify-between">
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm flex items-center">
+                                  <Clock className="mr-1 h-4 w-4" />
+                                  {ride.duration}
+                                </div>
+                                <div className="text-xl font-bold text-carpu-purple">{ride.price}€</div>
                               </div>
-                              <div className="text-xl font-bold text-carpu-purple">{ride.price}€</div>
+                              
+                              <div className="text-sm text-muted-foreground mb-2">
+                                {ride.seats} {ride.seats > 1 ? 'places disponibles' : 'place disponible'}
+                              </div>
+                              
+                              <Button 
+                                className="bg-carpu-gradient hover:opacity-90 transition-opacity w-full mt-auto"
+                                onClick={() => handleReservation(ride.id)}
+                              >
+                                {user ? 'Réserver' : 'Se connecter pour réserver'}
+                              </Button>
                             </div>
-                            
-                            <div className="text-sm text-muted-foreground mb-2">
-                              {ride.seats} {ride.seats > 1 ? 'places disponibles' : 'place disponible'}
-                            </div>
-                            
-                            <Button className="bg-carpu-gradient hover:opacity-90 transition-opacity w-full mt-auto">
-                              Réserver
-                            </Button>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center p-10 bg-muted/30 rounded-lg">
+                    <p className="text-muted-foreground">
+                      Aucun trajet ne correspond à vos critères de recherche.
+                    </p>
+                    <p className="text-sm mt-2 text-muted-foreground">
+                      Essayez de modifier vos filtres ou vos critères de recherche.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
