@@ -1,14 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { X, Menu, Car, User, Search, MapPin } from 'lucide-react';
+import { X, Menu, Car, User, Search, MapPin, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -30,6 +33,11 @@ const Navbar: React.FC = () => {
     { name: "Proposer", path: "/offer", icon: <Car className="mr-2 h-4 w-4" /> },
     { name: "Comment ça marche", path: "/how-it-works", icon: <MapPin className="mr-2 h-4 w-4" /> },
   ];
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   return (
     <header
@@ -67,12 +75,39 @@ const Navbar: React.FC = () => {
 
         {/* Desktop Authentication */}
         <div className="hidden md:flex items-center space-x-3">
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/login">Se connecter</Link>
-          </Button>
-          <Button asChild size="sm" className="bg-carpu-gradient hover:opacity-90 transition-opacity">
-            <Link to="/signup">S'inscrire</Link>
-          </Button>
+          {user ? (
+            <>
+              <Button 
+                asChild 
+                variant="ghost" 
+                size="sm" 
+                className="flex items-center"
+              >
+                <Link to="/profile">
+                  <User className="mr-2 h-4 w-4" />
+                  Profil
+                </Link>
+              </Button>
+              <Button 
+                onClick={handleSignOut} 
+                variant="outline" 
+                size="sm" 
+                className="flex items-center"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Déconnexion
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/login">Se connecter</Link>
+              </Button>
+              <Button asChild size="sm" className="bg-carpu-gradient hover:opacity-90 transition-opacity">
+                <Link to="/signup">S'inscrire</Link>
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu Button */}
@@ -120,15 +155,40 @@ const Navbar: React.FC = () => {
               </Link>
             ))}
             <div className="pt-4 mt-4 border-t space-y-2">
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/login" className="flex items-center">
-                  <User className="mr-2 h-4 w-4" />
-                  Se connecter
-                </Link>
-              </Button>
-              <Button asChild className="w-full bg-carpu-gradient hover:opacity-90 transition-opacity">
-                <Link to="/signup">S'inscrire</Link>
-              </Button>
+              {user ? (
+                <>
+                  <Button 
+                    asChild 
+                    variant="outline" 
+                    className="w-full flex items-center"
+                  >
+                    <Link to="/profile">
+                      <User className="mr-2 h-4 w-4" />
+                      Profil
+                    </Link>
+                  </Button>
+                  <Button 
+                    onClick={handleSignOut} 
+                    variant="outline" 
+                    className="w-full flex items-center"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Déconnexion
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link to="/login" className="flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      Se connecter
+                    </Link>
+                  </Button>
+                  <Button asChild className="w-full bg-carpu-gradient hover:opacity-90 transition-opacity">
+                    <Link to="/signup">S'inscrire</Link>
+                  </Button>
+                </>
+              )}
             </div>
           </nav>
         </div>
