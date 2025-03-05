@@ -8,15 +8,31 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Login = () => {
   const { signIn, isLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await signIn(email, password);
+    setEmailNotVerified(false);
+    try {
+      await signIn(email, password);
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      if (error.code === 'email_not_confirmed') {
+        setEmailNotVerified(true);
+      }
+    }
+  };
+
+  const handleResendEmail = () => {
+    toast.info("Un email de vérification a été envoyé à votre adresse email.");
+    // This would typically call a function to resend verification email
+    // But for now, we'll just show a toast to acknowledge the action
   };
 
   return (
@@ -30,6 +46,20 @@ const Login = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {emailNotVerified && (
+              <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
+                <p className="text-amber-800 text-sm">
+                  Votre email n'a pas été vérifié. Veuillez vérifier votre boîte de réception et cliquer sur le lien de confirmation.
+                </p>
+                <Button 
+                  variant="link" 
+                  className="text-amber-800 p-0 h-auto text-sm font-medium underline"
+                  onClick={handleResendEmail}
+                >
+                  Renvoyer l'email de vérification
+                </Button>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">Email</label>

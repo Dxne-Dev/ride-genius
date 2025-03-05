@@ -12,6 +12,7 @@ type AuthContextType = {
   signUp: (email: string, password: string, metadata: { firstName: string; lastName: string; phone: string }) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resendVerificationEmail?: (email: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error('Error signing up:', error);
       toast.error(error.message || 'Une erreur est survenue lors de l\'inscription');
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -98,9 +100,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       navigate('/');
     } catch (error: any) {
       console.error('Error signing in:', error);
-      toast.error(error.message || 'Email ou mot de passe incorrect');
+      
+      if (error.code === 'email_not_confirmed') {
+        toast.error('Email non vérifié. Veuillez vérifier votre boîte de réception.');
+      } else {
+        toast.error(error.message || 'Email ou mot de passe incorrect');
+      }
+      
+      throw error;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      });
+
+      if (error) {
+        throw error;
+      }
+      
+      toast.success('Email de vérification envoyé !');
+    } catch (error: any) {
+      console.error('Error resending verification email:', error);
+      toast.error(error.message || 'Erreur lors de l\'envoi de l\'email de vérification');
     }
   };
 
@@ -126,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signUp,
     signIn,
     signOut,
+    resendVerificationEmail,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
