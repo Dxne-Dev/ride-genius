@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import SearchForm, { SearchData } from '@/components/search/SearchForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
-import { format } from 'date-fns';
+import { format, isEqual, parseISO, isValid } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CarFront, Clock, MapPin, CreditCard, Star, Filter } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface RideResult {
   id: string;
@@ -41,8 +42,10 @@ const Search = () => {
   const [priceRange, setPriceRange] = useState([0, 100]);
   const [showFilters, setShowFilters] = useState(false);
   const [filteredResults, setFilteredResults] = useState<RideResult[]>([]);
+  const [isReserving, setIsReserving] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Mock data for demonstration
   const mockResults: RideResult[] = [
@@ -111,8 +114,60 @@ const Search = () => {
       car: 'Citroën C4',
       distance: '465 km',
       duration: '4h 30min'
+    },
+    {
+      id: '4',
+      driver: {
+        name: 'Sophie Petit',
+        avatar: 'https://randomuser.me/api/portraits/women/23.jpg',
+        rating: 4.7,
+        verified: true
+      },
+      departure: {
+        city: 'Marseille',
+        time: '10:00'
+      },
+      destination: {
+        city: 'Nice',
+        time: '12:00'
+      },
+      price: 22,
+      seats: 3,
+      car: 'Toyota Yaris',
+      distance: '200 km',
+      duration: '2h 00min'
+    },
+    {
+      id: '5',
+      driver: {
+        name: 'Jean Moreau',
+        avatar: 'https://randomuser.me/api/portraits/men/45.jpg',
+        rating: 4.5,
+        verified: true
+      },
+      departure: {
+        city: 'Bordeaux',
+        time: '07:30'
+      },
+      destination: {
+        city: 'Toulouse',
+        time: '10:30'
+      },
+      price: 25,
+      seats: 2,
+      car: 'Volkswagen Golf',
+      distance: '245 km',
+      duration: '3h 00min'
     }
   ];
+  
+  // Check if search parameters were passed from the home page
+  useEffect(() => {
+    const searchData = location.state?.searchData;
+    if (searchData) {
+      setSearchParams(searchData);
+    }
+  }, [location]);
   
   // Apply filters whenever search parameters or price range changes
   useEffect(() => {
@@ -144,16 +199,67 @@ const Search = () => {
     console.log('Search data:', data);
   };
   
-  const handleReservation = (rideId: string) => {
+  const handleReservation = async (rideId: string) => {
     if (!user) {
       toast.error('Veuillez vous connecter pour réserver un trajet');
       navigate('/login');
       return;
     }
     
-    toast.success('Réservation en cours de traitement...');
-    // Here you would typically handle the actual reservation process
+    setIsReserving(rideId);
+    
+    try {
+      // Find the ride in filteredResults
+      const ride = filteredResults.find(r => r.id === rideId);
+      
+      if (!ride) {
+        throw new Error("Ce trajet n'existe pas");
+      }
+      
+      // In a real-world scenario, we would store this in Supabase
+      // For now, we'll simulate a successful reservation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast.success(`Votre réservation pour ${ride.departure.city} → ${ride.destination.city} a été confirmée !`);
+      
+      // Redirect to the rides page
+      navigate('/rides');
+    } catch (error) {
+      console.error('Reservation error:', error);
+      toast.error("Une erreur est survenue lors de la réservation");
+    } finally {
+      setIsReserving(null);
+    }
   };
+
+  // Filter options for departure time 
+  const [timeFilters, setTimeFilters] = useState({
+    morning: false,
+    afternoon: false,
+    evening: false
+  });
+
+  // Apply time filters to results
+  const applyTimeFilters = (results: RideResult[]) => {
+    // If no time filters are selected, return all results
+    if (!timeFilters.morning && !timeFilters.afternoon && !timeFilters.evening) {
+      return results;
+    }
+
+    return results.filter(ride => {
+      const hourStr = ride.departure.time.split(':')[0];
+      const hour = parseInt(hourStr);
+
+      if (timeFilters.morning && hour < 12) return true;
+      if (timeFilters.afternoon && hour >= 12 && hour < 18) return true;
+      if (timeFilters.evening && hour >= 18) return true;
+
+      return false;
+    });
+  };
+
+  // Get the final filtered results
+  const finalResults = searchParams ? applyTimeFilters(filteredResults) : [];
   
   return (
     <Layout>
@@ -161,7 +267,7 @@ const Search = () => {
         <div className="container px-4 mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-4">Rechercher un trajet</h1>
-            <SearchForm onSearch={handleSearch} minimal />
+            <SearchForm onSearch={handleSearch} minimal initialData={searchParams} />
           </div>
           
           {searchParams && (
@@ -195,12 +301,36 @@ const Search = () => {
                       <div>
                         <h4 className="font-medium mb-3">Heure de départ</h4>
                         <div className="space-y-2">
-                          {['Matin (avant 12h)', 'Après-midi (12h-18h)', 'Soir (après 18h)'].map((time) => (
-                            <div key={time} className="flex items-center space-x-2">
-                              <Checkbox id={`time-${time}`} />
-                              <label htmlFor={`time-${time}`} className="text-sm">{time}</label>
-                            </div>
-                          ))}
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="time-morning" 
+                              checked={timeFilters.morning}
+                              onCheckedChange={(checked) => 
+                                setTimeFilters(prev => ({...prev, morning: checked === true}))
+                              }
+                            />
+                            <label htmlFor="time-morning" className="text-sm">Matin (avant 12h)</label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="time-afternoon" 
+                              checked={timeFilters.afternoon}
+                              onCheckedChange={(checked) => 
+                                setTimeFilters(prev => ({...prev, afternoon: checked === true}))
+                              }
+                            />
+                            <label htmlFor="time-afternoon" className="text-sm">Après-midi (12h-18h)</label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="time-evening" 
+                              checked={timeFilters.evening}
+                              onCheckedChange={(checked) => 
+                                setTimeFilters(prev => ({...prev, evening: checked === true}))
+                              }
+                            />
+                            <label htmlFor="time-evening" className="text-sm">Soir (après 18h)</label>
+                          </div>
                         </div>
                       </div>
                       
@@ -262,12 +392,36 @@ const Search = () => {
                           <div>
                             <h4 className="font-medium mb-3">Heure de départ</h4>
                             <div className="space-y-2">
-                              {['Matin (avant 12h)', 'Après-midi (12h-18h)', 'Soir (après 18h)'].map((time) => (
-                                <div key={time} className="flex items-center space-x-2">
-                                  <Checkbox id={`mobile-time-${time}`} />
-                                  <label htmlFor={`mobile-time-${time}`} className="text-sm">{time}</label>
-                                </div>
-                              ))}
+                              <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                  id="mobile-time-morning" 
+                                  checked={timeFilters.morning}
+                                  onCheckedChange={(checked) => 
+                                    setTimeFilters(prev => ({...prev, morning: checked === true}))
+                                  }
+                                />
+                                <label htmlFor="mobile-time-morning" className="text-sm">Matin (avant 12h)</label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                  id="mobile-time-afternoon" 
+                                  checked={timeFilters.afternoon}
+                                  onCheckedChange={(checked) => 
+                                    setTimeFilters(prev => ({...prev, afternoon: checked === true}))
+                                  }
+                                />
+                                <label htmlFor="mobile-time-afternoon" className="text-sm">Après-midi (12h-18h)</label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                  id="mobile-time-evening" 
+                                  checked={timeFilters.evening}
+                                  onCheckedChange={(checked) => 
+                                    setTimeFilters(prev => ({...prev, evening: checked === true}))
+                                  }
+                                />
+                                <label htmlFor="mobile-time-evening" className="text-sm">Soir (après 18h)</label>
+                              </div>
                             </div>
                           </div>
                           
@@ -295,9 +449,9 @@ const Search = () => {
                   </p>
                 </div>
                 
-                {filteredResults.length > 0 ? (
+                {finalResults.length > 0 ? (
                   <div className="space-y-4">
-                    {filteredResults.map((ride) => (
+                    {finalResults.map((ride) => (
                       <Card key={ride.id} className="overflow-hidden hover:shadow-md transition-shadow">
                         <CardContent className="p-0">
                           <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -366,8 +520,9 @@ const Search = () => {
                               <Button 
                                 className="bg-carpu-gradient hover:opacity-90 transition-opacity w-full mt-auto"
                                 onClick={() => handleReservation(ride.id)}
+                                disabled={isReserving === ride.id}
                               >
-                                {user ? 'Réserver' : 'Se connecter pour réserver'}
+                                {isReserving === ride.id ? 'Réservation en cours...' : (user ? 'Réserver' : 'Se connecter pour réserver')}
                               </Button>
                             </div>
                           </div>

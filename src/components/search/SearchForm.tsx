@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
@@ -14,6 +14,7 @@ interface SearchFormProps {
   className?: string;
   onSearch?: (searchData: SearchData) => void;
   minimal?: boolean;
+  initialData?: SearchData | null;
 }
 
 export interface SearchData {
@@ -23,11 +24,21 @@ export interface SearchData {
   passengers: number;
 }
 
-const SearchForm: React.FC<SearchFormProps> = ({ className, onSearch, minimal = false }) => {
+const SearchForm: React.FC<SearchFormProps> = ({ className, onSearch, minimal = false, initialData }) => {
   const [departure, setDeparture] = useState('');
   const [destination, setDestination] = useState('');
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [passengers, setPassengers] = useState('1');
+  
+  // Initialize form with initial data if provided
+  useEffect(() => {
+    if (initialData) {
+      setDeparture(initialData.departure);
+      setDestination(initialData.destination);
+      setDate(initialData.date);
+      setPassengers(initialData.passengers.toString());
+    }
+  }, [initialData]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
