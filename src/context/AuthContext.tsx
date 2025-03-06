@@ -1,9 +1,21 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { UserProfile, UserRole } from '@/types/models';
+
+// Type pour les rôles d'utilisateur
+export type UserRole = 'passager' | 'conducteur' | 'admin';
+
+// Type pour les données de profil
+export type UserProfile = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  role: UserRole;
+};
 
 type AuthContextType = {
   user: User | null;
@@ -62,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    // Check active session
     const getSession = async () => {
       setIsLoading(true);
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -82,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     getSession();
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
@@ -153,6 +167,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       toast.success('Connexion réussie !');
       
+      // Redirection en fonction du rôle
       if (profile) {
         switch(profile.role) {
           case 'admin':
@@ -217,6 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
   
+  // Fonctions helper pour vérifier le rôle
   const isAdmin = () => profile?.role === 'admin';
   const isDriver = () => profile?.role === 'conducteur';
   const isPassenger = () => profile?.role === 'passager';
