@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -11,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Calendar as CalendarIcon, Car, Clock, CurrencyEuro, Users } from 'lucide-react';
+import { Calendar as CalendarIcon, Car, Clock, Euro, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
@@ -28,7 +27,6 @@ const Offer = () => {
   const [seats, setSeats] = useState('');
   const [submitting, setSubmitting] = useState(false);
   
-  // Redirect to login if not logged in
   useEffect(() => {
     if (!isLoading && !user) {
       toast.error('Vous devez être connecté pour proposer un trajet');
@@ -41,7 +39,6 @@ const Offer = () => {
     
     setSubmitting(true);
     
-    // Log the data for demonstration
     console.info({
       date,
       departureTime,
@@ -49,12 +46,10 @@ const Offer = () => {
       seats
     });
     
-    // Simulate API call
     setTimeout(() => {
       toast.success('Votre trajet a été enregistré avec succès !');
       setSubmitting(false);
       
-      // Reset form
       setDate(new Date());
       setDepartureTime('');
       setDeparture('');
@@ -97,7 +92,6 @@ const Offer = () => {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Departure and Destination */}
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="departure">Ville de départ</Label>
@@ -130,7 +124,6 @@ const Offer = () => {
                     </div>
                   </div>
                   
-                  {/* Date and Time */}
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label>Date de départ</Label>
@@ -180,12 +173,11 @@ const Offer = () => {
                   </div>
                 </div>
                 
-                {/* Price and Seats */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="price">Prix par passager (€)</Label>
                     <div className="relative">
-                      <CurrencyEuro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Euro className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input 
                         id="price" 
                         type="number" 
