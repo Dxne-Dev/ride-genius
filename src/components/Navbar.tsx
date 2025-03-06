@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { X, Menu, Car, User, Search, MapPin, LogOut, Ticket } from 'lucide-react';
+import { X, Menu, Car, User, Search, MapPin, LogOut, Ticket, ShieldCheck, UserCircle, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 
@@ -10,7 +10,7 @@ const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut, isAdmin, isDriver, isPassenger } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -28,20 +28,42 @@ const Navbar: React.FC = () => {
     setIsOpen(false);
   }, [location]);
 
-  // Liens de navigation pour tous les utilisateurs
+  // Liens de navigation pour tous les utilisateurs non connectés
   const publicNavLinks = [
     { name: "Rechercher", path: "/search", icon: <Search className="mr-2 h-4 w-4" /> },
     { name: "Comment ça marche", path: "/how-it-works", icon: <MapPin className="mr-2 h-4 w-4" /> },
   ];
   
-  // Liens supplémentaires pour les utilisateurs connectés
-  const authNavLinks = [
-    { name: "Proposer", path: "/offer", icon: <Car className="mr-2 h-4 w-4" /> },
-    { name: "Mes trajets", path: "/rides", icon: <Ticket className="mr-2 h-4 w-4" /> },
+  // Liens pour les passagers
+  const passengerNavLinks = [
+    { name: "Rechercher", path: "/search", icon: <Search className="mr-2 h-4 w-4" /> },
+    { name: "Mes trajets", path: "/passenger/dashboard", icon: <Ticket className="mr-2 h-4 w-4" /> },
+    { name: "Comment ça marche", path: "/how-it-works", icon: <MapPin className="mr-2 h-4 w-4" /> },
   ];
   
-  // Liens à afficher en fonction de l'état de connexion
-  const navLinks = user ? [...publicNavLinks, ...authNavLinks] : publicNavLinks;
+  // Liens pour les conducteurs
+  const driverNavLinks = [
+    { name: "Proposer", path: "/driver/offer", icon: <Car className="mr-2 h-4 w-4" /> },
+    { name: "Mes trajets", path: "/driver/dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
+    { name: "Comment ça marche", path: "/how-it-works", icon: <MapPin className="mr-2 h-4 w-4" /> },
+  ];
+  
+  // Liens pour les administrateurs
+  const adminNavLinks = [
+    { name: "Administration", path: "/admin/dashboard", icon: <ShieldCheck className="mr-2 h-4 w-4" /> },
+    { name: "Rechercher", path: "/search", icon: <Search className="mr-2 h-4 w-4" /> },
+  ];
+  
+  // Sélectionner les liens en fonction du rôle
+  const getNavLinks = () => {
+    if (!user) return publicNavLinks;
+    
+    if (isAdmin()) return adminNavLinks;
+    if (isDriver()) return driverNavLinks;
+    return passengerNavLinks; // Par défaut, utiliser les liens passagers
+  };
+  
+  const navLinks = getNavLinks();
 
   const handleSignOut = async () => {
     await signOut();
@@ -86,6 +108,11 @@ const Navbar: React.FC = () => {
         <div className="hidden md:flex items-center space-x-3">
           {user ? (
             <>
+              <div className="text-sm text-muted-foreground mr-2">
+                {profile?.first_name && (
+                  <span>Bonjour, {profile.first_name}</span>
+                )}
+              </div>
               <Button 
                 asChild 
                 variant="ghost" 
@@ -93,7 +120,7 @@ const Navbar: React.FC = () => {
                 className="flex items-center"
               >
                 <Link to="/profile">
-                  <User className="mr-2 h-4 w-4" />
+                  <UserCircle className="mr-2 h-4 w-4" />
                   Profil
                 </Link>
               </Button>
@@ -172,7 +199,7 @@ const Navbar: React.FC = () => {
                     className="w-full flex items-center"
                   >
                     <Link to="/profile">
-                      <User className="mr-2 h-4 w-4" />
+                      <UserCircle className="mr-2 h-4 w-4" />
                       Profil
                     </Link>
                   </Button>

@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { useAuth } from '@/context/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { useAuth, UserRole } from '@/context/AuthContext';
+import { Loader2, User, Car, Shield } from 'lucide-react';
 
 const Signup = () => {
   const { signUp, isLoading } = useAuth();
@@ -19,12 +21,17 @@ const Signup = () => {
     phone: '',
     password: '',
     confirmPassword: '',
+    role: 'passager' as UserRole,
     acceptTerms: false
   });
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleRoleChange = (value: string) => {
+    setFormData(prev => ({ ...prev, role: value as UserRole }));
   };
 
   const handleCheckboxChange = (checked: boolean) => {
@@ -70,7 +77,8 @@ const Signup = () => {
         {
           firstName: formData.firstName,
           lastName: formData.lastName,
-          phone: formData.phone
+          phone: formData.phone,
+          role: formData.role
         }
       );
     } catch (error) {
@@ -156,6 +164,31 @@ const Signup = () => {
                   required 
                 />
               </div>
+              
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Choisissez votre rôle</Label>
+                <RadioGroup
+                  value={formData.role}
+                  onValueChange={handleRoleChange}
+                  className="grid grid-cols-1 gap-2"
+                >
+                  <div className="flex items-center space-x-2 border rounded-md p-3 hover:bg-accent cursor-pointer">
+                    <RadioGroupItem value="passager" id="passager" />
+                    <Label htmlFor="passager" className="flex items-center cursor-pointer">
+                      <User className="h-4 w-4 mr-2" />
+                      Passager - Je cherche des trajets
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2 border rounded-md p-3 hover:bg-accent cursor-pointer">
+                    <RadioGroupItem value="conducteur" id="conducteur" />
+                    <Label htmlFor="conducteur" className="flex items-center cursor-pointer">
+                      <Car className="h-4 w-4 mr-2" />
+                      Conducteur - Je propose des trajets
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
               <div className="flex items-center space-x-2">
                 <Checkbox 
                   id="terms" 
