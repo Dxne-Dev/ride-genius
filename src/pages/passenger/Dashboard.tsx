@@ -1,86 +1,45 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Layout from '@/components/Layout';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { CarFront, Clock, Calendar, User, Star, ExternalLink, X } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-
-// Types pour les réservations
-interface Booking {
-  id: string;
-  ride_id: string;
-  passenger_id: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
-  seats: number;
-  created_at: string;
-  ride: {
-    id: string;
-    departure: string;
-    destination: string;
-    departure_time: string;
-    price: number;
-    driver_id: string;
-    driver: {
-      first_name: string;
-      last_name: string;
-      phone: string;
-    };
-  };
-}
+import { ArrowRight, CalendarIcon, Clock, MapPin, Star, User } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { Link } from 'react-router-dom';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Booking, Ride } from '@/types/models';
 
 const PassengerDashboard = () => {
-  const { user, profile, isLoading, isPassenger } = useAuth();
-  const navigate = useNavigate();
-  
+  const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [fetchingBookings, setFetchingBookings] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('upcoming');
   
-  // Rediriger si ce n'est pas un passager
+  // For reviews
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
   useEffect(() => {
-    if (!isLoading && user) {
-      if (!isPassenger()) {
-        // Si l'utilisateur est conducteur ou admin, rediriger vers le tableau de bord approprié
-        if (profile?.role === 'conducteur') {
-          navigate('/driver/dashboard');
-        } else if (profile?.role === 'admin') {
-          navigate('/admin/dashboard');
-        } else {
-          toast.error("Une erreur s'est produite avec votre profil.");
-          navigate('/');
-        }
-      }
-    } else if (!isLoading && !user) {
-      navigate('/login');
-    }
-  }, [isLoading, user, profile, isPassenger, navigate]);
-  
-  // Charger les réservations du passager
-  useEffect(() => {
+    if (!user) return;
+    
     const fetchBookings = async () => {
-      if (!user) return;
-      
+      setIsLoading(true);
       try {
+        // Get all bookings with ride details
         const { data, error } = await supabase
           .from('bookings')
           .select(`
             *,
-            ride:ride_id (
-              id,
-              departure,
-              destination,
-              departure_time,
-              price,
-              driver_id,
-              driver:driver_id (
-                first_name,
-                last_name,
-                phone
-              )
+            ride:ride_id(
+              *,
+              driver:driver_id(*)
             )
           `)
           .eq('passenger_id', user.id)
@@ -88,332 +47,356 @@ const PassengerDashboard = () => {
           
         if (error) throw error;
         
-        setBookings(data as Booking[] || []);
-      } catch (error: any) {
-        console.error('Erreur lors du chargement des réservations:', error);
+        setBookings(data || []);
+      } catch (error) {
+        console.error('Error fetching bookings:', error);
         toast.error('Erreur lors du chargement des réservations');
       } finally {
-        setFetchingBookings(false);
+        setIsLoading(false);
       }
     };
     
-    if (user && isPassenger()) {
-      fetchBookings();
-    }
-  }, [user, isPassenger]);
-  
-  // Annuler une réservation
-  const handleCancelBooking = async (bookingId: string) => {
+    fetchBookings();
+  }, [user]);
+
+  const cancelBooking = async (bookingId: string) => {
     try {
       const { error } = await supabase
         .from('bookings')
         .update({ status: 'cancelled' })
-        .eq('id', bookingId)
-        .eq('passenger_id', user?.id);
+        .eq('id', bookingId);
         
       if (error) throw error;
       
-      // Mettre à jour l'état local
+      // Update local state
       setBookings(prevBookings => 
         prevBookings.map(booking => 
           booking.id === bookingId ? { ...booking, status: 'cancelled' } : booking
         )
       );
       
-      toast.success('Réservation annulée avec succès');
-    } catch (error: any) {
-      console.error('Erreur lors de l\'annulation de la réservation:', error);
-      toast.error('Erreur lors de l\'annulation de la réservation');
+      toast.success('Réservation annulée');
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      toast.error("Erreur lors de l'annulation de la réservation");
     }
   };
-  
-  // Formater la date pour l'affichage
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+
+  const submitReview = async () => {
+    if (!selectedBooking || rating === 0) {
+      toast.error('Veuillez sélectionner une note');
+      return;
+    }
+    
+    setIsSubmittingReview(true);
+    try {
+      // Check if a review already exists
+      const { data: existingReviews, error: checkError } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('booking_id', selectedBooking.id)
+        .eq('author_id', user!.id);
+        
+      if (checkError) throw checkError;
+      
+      if (existingReviews && existingReviews.length > 0) {
+        toast.error('Vous avez déjà laissé un avis pour ce trajet');
+        return;
+      }
+      
+      // Create the review
+      const { error } = await supabase
+        .from('reviews')
+        .insert({
+          booking_id: selectedBooking.id,
+          author_id: user!.id,
+          recipient_id: selectedBooking.ride?.driver?.id || selectedBooking.ride?.driver_id,
+          rating,
+          comment: comment.trim() || null
+        });
+        
+      if (error) throw error;
+      
+      // Mark the booking as "completed" if it was "accepted"
+      if (selectedBooking.status === 'accepted') {
+        const { error: updateError } = await supabase
+          .from('bookings')
+          .update({ status: 'completed' })
+          .eq('id', selectedBooking.id);
+          
+        if (updateError) throw updateError;
+        
+        // Update local state
+        setBookings(prevBookings => 
+          prevBookings.map(booking => 
+            booking.id === selectedBooking.id ? { ...booking, status: 'completed' } : booking
+          )
+        );
+      }
+      
+      toast.success('Merci pour votre avis !');
+      setRating(0);
+      setComment('');
+      setSelectedBooking(null);
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      toast.error("Erreur lors de l'envoi de l'avis");
+    } finally {
+      setIsSubmittingReview(false);
+    }
   };
-  
-  // Formater l'heure pour l'affichage
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+
+  const getFilteredBookings = () => {
+    if (activeTab === 'upcoming') {
+      return bookings.filter(booking => 
+        (booking.status === 'pending' || booking.status === 'accepted') && 
+        booking.ride && 
+        new Date(booking.ride.departure_time) > new Date()
+      );
+    } else if (activeTab === 'past') {
+      return bookings.filter(booking => 
+        (booking.status === 'completed' || 
+         (booking.ride && new Date(booking.ride.departure_time) < new Date()))
+      );
+    } else if (activeTab === 'cancelled') {
+      return bookings.filter(booking => booking.status === 'cancelled' || booking.status === 'rejected');
+    }
+    return bookings;
   };
-  
-  if (isLoading) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-20 flex items-center justify-center min-h-[80vh]">
-          <p>Chargement...</p>
-        </div>
-      </Layout>
-    );
-  }
-  
-  if (!user || !isPassenger()) {
-    return null; // Will redirect in useEffect
-  }
-  
-  // Filtrer les réservations par statut
-  const pendingBookings = bookings.filter(b => b.status === 'pending');
-  const acceptedBookings = bookings.filter(b => b.status === 'accepted');
-  const otherBookings = bookings.filter(b => !['pending', 'accepted'].includes(b.status));
-  
+
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-20">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold mb-2">Tableau de bord passager</h1>
-          <p className="text-muted-foreground mb-8">
-            Gérez vos réservations et vos trajets
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Réservations en attente</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{pendingBookings.length}</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Réservations confirmées</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{acceptedBookings.length}</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Total des réservations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">{bookings.length}</div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="flex justify-end mb-6">
-            <Button asChild className="bg-carpu-gradient hover:opacity-90">
-              <a href="/search">
-                <CarFront className="mr-2 h-4 w-4" />
-                Rechercher un trajet
-              </a>
-            </Button>
-          </div>
-          
-          <Tabs defaultValue="upcoming">
-            <TabsList className="mb-6">
-              <TabsTrigger value="upcoming">Trajets à venir</TabsTrigger>
-              <TabsTrigger value="past">Historique</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="upcoming">
-              {fetchingBookings ? (
-                <p>Chargement des réservations...</p>
-              ) : [...pendingBookings, ...acceptedBookings].length > 0 ? (
-                <div className="space-y-4">
-                  {[...pendingBookings, ...acceptedBookings].map((booking) => (
-                    <Card key={booking.id}>
-                      <CardContent className="p-6">
-                        <div className="flex flex-col md:flex-row justify-between gap-4">
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <Calendar className="h-5 w-5 mr-2 text-muted-foreground" />
-                              <span>{formatDate(booking.ride.departure_time)}</span>
-                              <Clock className="h-5 w-5 ml-4 mr-2 text-muted-foreground" />
-                              <span>{formatTime(booking.ride.departure_time)}</span>
-                              <span className="ml-4 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                booking.status === 'pending' ? 'bg-amber-100 text-amber-800' :
-                                booking.status === 'accepted' ? 'bg-green-100 text-green-800' :
-                                booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
-                              }">
-                                {booking.status === 'pending' ? 'En attente' :
-                                booking.status === 'accepted' ? 'Confirmé' :
-                                booking.status === 'rejected' ? 'Refusé' :
-                                booking.status === 'cancelled' ? 'Annulé' : booking.status}
-                              </span>
-                            </div>
-                            
-                            <h3 className="text-xl font-bold mb-2">
-                              {booking.ride.departure} → {booking.ride.destination}
-                            </h3>
-                            
-                            <div className="flex items-center text-sm mb-2">
-                              <User className="h-4 w-4 mr-2" />
-                              <span className="font-medium">
-                                {booking.ride.driver.first_name} {booking.ride.driver.last_name}
-                              </span>
-                              <span className="mx-2">•</span>
-                              <span>{booking.ride.driver.phone}</span>
-                            </div>
-                            
-                            <div className="text-sm">
-                              <span className="font-medium">{booking.seats}</span> place(s) réservée(s) - Total: <span className="font-medium">{booking.seats * booking.ride.price}€</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-col justify-between">
-                            <div className="flex space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                asChild
-                              >
-                                <a href={`/rides/${booking.ride_id}`}>
-                                  <ExternalLink className="mr-2 h-4 w-4" />
-                                  Détails
-                                </a>
-                              </Button>
-                              
-                              {booking.status === 'pending' || booking.status === 'accepted' ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-red-600 border-red-200 hover:bg-red-50"
-                                  onClick={() => handleCancelBooking(booking.id)}
-                                >
-                                  <X className="mr-2 h-4 w-4" />
-                                  Annuler
-                                </Button>
-                              ) : null}
-                            </div>
-                            
-                            {booking.status === 'accepted' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="mt-2"
-                              >
-                                Contact conducteur
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Aucun trajet à venir</CardTitle>
-                    <CardDescription>
-                      Vous n'avez pas de réservations en cours ou confirmées.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Utilisez la recherche pour trouver et réserver des trajets.
-                    </p>
-                  </CardContent>
-                  <CardFooter>
-                    <Button asChild className="bg-carpu-gradient hover:opacity-90">
-                      <a href="/search">
-                        Rechercher un trajet
-                      </a>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="past">
-              {fetchingBookings ? (
-                <p>Chargement de l'historique...</p>
-              ) : otherBookings.length > 0 ? (
-                <div className="space-y-4">
-                  {otherBookings.map((booking) => (
-                    <Card key={booking.id}>
-                      <CardContent className="p-6">
-                        <div className="flex flex-col md:flex-row justify-between gap-4">
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <Calendar className="h-5 w-5 mr-2 text-muted-foreground" />
-                              <span>{formatDate(booking.ride.departure_time)}</span>
-                              <span className="ml-4 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                booking.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                booking.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
-                                'bg-blue-100 text-blue-800'
-                              }">
-                                {booking.status === 'rejected' ? 'Refusé' :
-                                booking.status === 'cancelled' ? 'Annulé' : 
-                                booking.status === 'completed' ? 'Terminé' : booking.status}
-                              </span>
-                            </div>
-                            
-                            <h3 className="text-xl font-bold mb-2">
-                              {booking.ride.departure} → {booking.ride.destination}
-                            </h3>
-                            
-                            <div className="flex items-center text-sm mb-2">
-                              <User className="h-4 w-4 mr-2" />
-                              <span>
-                                {booking.ride.driver.first_name} {booking.ride.driver.last_name}
-                              </span>
-                            </div>
-                            
-                            <div className="text-sm">
-                              <span>{booking.seats}</span> place(s) - <span>{booking.seats * booking.ride.price}€</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-col justify-between">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              asChild
-                            >
-                              <a href={`/rides/${booking.ride_id}`}>
-                                Détails
-                              </a>
-                            </Button>
-                            
-                            {booking.status === 'completed' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="mt-2"
-                                asChild
-                              >
-                                <a href={`/reviews/add/${booking.id}`}>
-                                  <Star className="mr-2 h-4 w-4" />
-                                  Laisser un avis
-                                </a>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Aucun trajet passé</CardTitle>
-                    <CardDescription>
-                      Vous n'avez pas encore d'historique de trajets.
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
+    <div className="container mx-auto p-4 max-w-6xl">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Mes réservations</h1>
+        <Link to="/search">
+          <Button>Rechercher un trajet</Button>
+        </Link>
       </div>
-    </Layout>
+      
+      <Tabs defaultValue="upcoming" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="upcoming">À venir</TabsTrigger>
+          <TabsTrigger value="past">Passés</TabsTrigger>
+          <TabsTrigger value="cancelled">Annulés</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="upcoming" className="space-y-4">
+          {isLoading ? (
+            <div className="text-center py-10">Chargement...</div>
+          ) : getFilteredBookings().length > 0 ? (
+            getFilteredBookings().map(booking => (
+              <Card key={booking.id} className="mb-4">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-xl">
+                        {booking.ride?.departure} <ArrowRight className="inline mx-2" /> {booking.ride?.destination}
+                      </CardTitle>
+                      <CardDescription>
+                        <div className="flex items-center mt-2">
+                          <CalendarIcon className="w-4 h-4 mr-2" />
+                          {booking.ride?.departure_time && format(new Date(booking.ride.departure_time), 'PPPp', { locale: fr })}
+                        </div>
+                      </CardDescription>
+                    </div>
+                    <Badge className={
+                      booking.status === 'accepted' ? 'bg-green-500' : 
+                      booking.status === 'pending' ? 'bg-yellow-500' : 
+                      'bg-gray-500'
+                    }>
+                      {booking.status === 'accepted' ? 'Acceptée' : 
+                       booking.status === 'pending' ? 'En attente' : 
+                       booking.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <User className="w-4 h-4 mr-2" />
+                      Conducteur: {booking.ride?.driver?.first_name} {booking.ride?.driver?.last_name}
+                    </div>
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      Départ: {booking.ride?.departure}
+                    </div>
+                    <div className="flex items-center">
+                      <Clock className="w-4 h-4 mr-2" />
+                      Heure: {booking.ride?.departure_time && format(new Date(booking.ride.departure_time), 'p', { locale: fr })}
+                    </div>
+                    <div>
+                      <p className="font-medium">{booking.seats} place(s) • {booking.ride?.price && Number(booking.ride.price) * booking.seats} €</p>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  {booking.status !== 'cancelled' && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => cancelBooking(booking.id)}
+                      className="mr-2"
+                    >
+                      Annuler
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-10">
+              <p className="mb-4">Vous n'avez pas de réservation à venir</p>
+              <Link to="/search">
+                <Button>Rechercher un trajet</Button>
+              </Link>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="past" className="space-y-4">
+          {isLoading ? (
+            <div className="text-center py-10">Chargement...</div>
+          ) : getFilteredBookings().length > 0 ? (
+            getFilteredBookings().map(booking => (
+              <Card key={booking.id} className="mb-4">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-xl">
+                        {booking.ride?.departure} <ArrowRight className="inline mx-2" /> {booking.ride?.destination}
+                      </CardTitle>
+                      <CardDescription>
+                        <div className="flex items-center mt-2">
+                          <CalendarIcon className="w-4 h-4 mr-2" />
+                          {booking.ride?.departure_time && format(new Date(booking.ride.departure_time), 'PPPp', { locale: fr })}
+                        </div>
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline">
+                      {booking.status === 'completed' ? 'Terminé' : 'Passé'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <User className="w-4 h-4 mr-2" />
+                      Conducteur: {booking.ride?.driver?.first_name} {booking.ride?.driver?.last_name}
+                    </div>
+                    <div>
+                      <p className="font-medium">{booking.seats} place(s) • {booking.ride?.price && Number(booking.ride.price) * booking.seats} €</p>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  {(booking.status === 'accepted' || booking.status === 'completed') && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button 
+                          onClick={() => setSelectedBooking(booking)}
+                          variant="outline"
+                        >
+                          <Star className="w-4 h-4 mr-2" /> Laisser un avis
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Laisser un avis</DialogTitle>
+                          <DialogDescription>
+                            Evaluez votre expérience avec {booking.ride?.driver?.first_name} {booking.ride?.driver?.last_name}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <div className="flex items-center justify-center space-x-1 mb-4">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Button 
+                                key={star} 
+                                variant="ghost" 
+                                className="p-2"
+                                onClick={() => setRating(star)}
+                              >
+                                <Star 
+                                  className={`w-8 h-8 ${rating >= star ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
+                                />
+                              </Button>
+                            ))}
+                          </div>
+                          <textarea 
+                            className="w-full p-2 border rounded-md" 
+                            rows={4}
+                            placeholder="Partagez votre expérience (optionnel)"
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                          />
+                        </div>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button variant="outline" className="mr-2">Annuler</Button>
+                          </DialogClose>
+                          <Button 
+                            onClick={submitReview} 
+                            disabled={isSubmittingReview || rating === 0}
+                          >
+                            {isSubmittingReview ? 'Envoi...' : 'Envoyer'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </CardFooter>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-10">
+              <p>Vous n'avez pas de réservation passée</p>
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="cancelled" className="space-y-4">
+          {isLoading ? (
+            <div className="text-center py-10">Chargement...</div>
+          ) : getFilteredBookings().length > 0 ? (
+            getFilteredBookings().map(booking => (
+              <Card key={booking.id} className="mb-4">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-xl">
+                        {booking.ride?.departure} <ArrowRight className="inline mx-2" /> {booking.ride?.destination}
+                      </CardTitle>
+                      <CardDescription>
+                        <div className="flex items-center mt-2">
+                          <CalendarIcon className="w-4 h-4 mr-2" />
+                          {booking.ride?.departure_time && format(new Date(booking.ride.departure_time), 'PPPp', { locale: fr })}
+                        </div>
+                      </CardDescription>
+                    </div>
+                    <Badge variant="destructive">
+                      {booking.status === 'cancelled' ? 'Annulée' : 'Refusée'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <User className="w-4 h-4 mr-2" />
+                      Conducteur: {booking.ride?.driver?.first_name} {booking.ride?.driver?.last_name}
+                    </div>
+                    <div>
+                      <p className="font-medium">{booking.seats} place(s) • {booking.ride?.price && Number(booking.ride.price) * booking.seats} €</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-10">
+              <p>Vous n'avez pas de réservation annulée</p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 };
 
