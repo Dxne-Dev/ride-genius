@@ -3,8 +3,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const CTASection: React.FC = () => {
+  const { user } = useAuth();
+
   return (
     <section className="py-20">
       <div className="container px-4 mx-auto">
@@ -15,22 +18,47 @@ const CTASection: React.FC = () => {
           
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
             <div className="text-white max-w-xl">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">Prêt à rejoindre notre communauté ?</h2>
-              <p className="text-white/80 mb-6">
-                Inscrivez-vous gratuitement et commencez à voyager plus intelligemment, 
-                économiquement et écologiquement dès aujourd'hui !
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <Button asChild size="lg" className="bg-white text-carpu-purple hover:bg-white/90 transition-colors">
-                  <Link to="/signup">
-                    Créer un compte
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Link>
-                </Button>
-                <Button asChild size="lg" variant="outline" className="text-white border-white hover:bg-white/10">
-                  <Link to="/search">Trouver un trajet</Link>
-                </Button>
-              </div>
+              {user ? (
+                // Content for logged-in users
+                <>
+                  <h2 className="text-3xl md:text-4xl font-bold mb-4">Prêt à voyager ?</h2>
+                  <p className="text-white/80 mb-6">
+                    Trouvez votre prochain trajet ou proposez-en un pour faire des économies
+                    et contribuer à un environnement plus propre !
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <Button asChild size="lg" className="bg-white text-carpu-purple hover:bg-white/90 transition-colors">
+                      <Link to="/search">
+                        Trouver un trajet
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Link>
+                    </Button>
+                    <Button asChild size="lg" variant="outline" className="text-white border-white hover:bg-white/10">
+                      <Link to="/offer">Proposer un trajet</Link>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                // Content for non-logged-in users
+                <>
+                  <h2 className="text-3xl md:text-4xl font-bold mb-4">Prêt à rejoindre notre communauté ?</h2>
+                  <p className="text-white/80 mb-6">
+                    Inscrivez-vous gratuitement et commencez à voyager plus intelligemment, 
+                    économiquement et écologiquement dès aujourd'hui !
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <Button asChild size="lg" className="bg-white text-carpu-purple hover:bg-white/90 transition-colors">
+                      <Link to="/signup">
+                        Créer un compte
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </Link>
+                    </Button>
+                    <Button asChild size="lg" variant="outline" className="text-white border-white hover:bg-white/10">
+                      <Link to="/search">Trouver un trajet</Link>
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
             
             <div className="w-full md:w-auto">
