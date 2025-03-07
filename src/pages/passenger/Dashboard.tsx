@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
@@ -8,7 +7,7 @@ import { SearchData } from '@/types';
 import { useAuth } from '@/context/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Booking } from '@/types';
-import { CheckCircle, MapPin, RefreshCcw, Route, Star } from 'lucide-react';
+import { CheckCircle, MapPin, RefreshCcw, Route, Star, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import BookingCard from '@/components/bookings/BookingCard';
 import SearchForm from '@/components/search/SearchForm';
@@ -34,7 +33,6 @@ const PassengerDashboard = () => {
       try {
         setIsLoading(true);
         
-        // Fetch passenger's bookings
         const { data: bookingsData, error: bookingsError } = await supabase
           .from('bookings')
           .select(`
@@ -51,7 +49,6 @@ const PassengerDashboard = () => {
           
         if (bookingsError) throw bookingsError;
         
-        // Ensure type safety by casting each booking
         const typedBookings = bookingsData.map(booking => ({
           ...booking,
           status: booking.status as "pending" | "accepted" | "rejected" | "cancelled" | "completed",
@@ -61,7 +58,6 @@ const PassengerDashboard = () => {
           } : undefined
         }));
         
-        // Split into upcoming and past bookings
         const now = new Date();
         const upcoming: Booking[] = [];
         const past: Booking[] = [];
@@ -83,7 +79,6 @@ const PassengerDashboard = () => {
         setUpcomingBookings(upcoming);
         setPastBookings(past);
         
-        // Calculate stats
         const totalBookings = typedBookings.length;
         const upcomingCount = upcoming.length;
         const completedCount = typedBookings.filter(b => b.status === 'completed').length;
@@ -125,7 +120,6 @@ const PassengerDashboard = () => {
         
       if (error) throw error;
       
-      // Update local state
       setUpcomingBookings(prev => prev.filter(b => b.id !== bookingId));
       
       toast.success('Réservation annulée');
@@ -144,7 +138,6 @@ const PassengerDashboard = () => {
             Gérez vos réservations et recherchez de nouveaux trajets
           </p>
           
-          {/* Stats cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <Card>
               <CardContent className="p-6">
@@ -203,7 +196,6 @@ const PassengerDashboard = () => {
             </Card>
           </div>
           
-          {/* Search form */}
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>Rechercher un trajet</CardTitle>
@@ -217,7 +209,6 @@ const PassengerDashboard = () => {
           </Card>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Upcoming bookings */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -231,7 +222,7 @@ const PassengerDashboard = () => {
                   variant="outline"
                   className="flex items-center"
                 >
-                  <MapSearch className="mr-2 h-4 w-4" />
+                  <MapPin className="mr-2 h-4 w-4" />
                   Rechercher
                 </Button>
               </CardHeader>
@@ -264,7 +255,7 @@ const PassengerDashboard = () => {
                       onClick={() => navigate('/search')}
                       className="bg-carpu-gradient hover:opacity-90"
                     >
-                      <MapSearch className="mr-2 h-4 w-4" />
+                      <Search className="mr-2 h-4 w-4" />
                       Rechercher un trajet
                     </Button>
                   </div>
@@ -272,7 +263,6 @@ const PassengerDashboard = () => {
               </CardContent>
             </Card>
             
-            {/* Past bookings */}
             <Card>
               <CardHeader>
                 <CardTitle>Historique</CardTitle>
