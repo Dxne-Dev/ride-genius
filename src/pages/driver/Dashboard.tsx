@@ -62,29 +62,16 @@ const DriverDashboard = () => {
             
           if (bookingsError) throw bookingsError;
           
-          // Group bookings by ride and ensure type safety
+          // Group bookings by ride
           const ridesWithBookings = ridesData.map(ride => ({
             ...ride,
-            status: ride.status as "active" | "completed" | "cancelled",
-            bookings: bookingsData
-              .filter(booking => booking.ride_id === ride.id)
-              .map(booking => ({
-                ...booking,
-                status: booking.status as "pending" | "accepted" | "rejected" | "cancelled" | "completed"
-              }))
+            bookings: bookingsData.filter(booking => booking.ride_id === ride.id)
           }));
           
-          setRides(ridesWithBookings as Ride[]);
+          setRides(ridesWithBookings);
           
-          // Set only pending bookings for display with proper type casting
-          const pendingBookings = bookingsData
-            .filter(b => b.status === 'pending')
-            .map(booking => ({
-              ...booking,
-              status: booking.status as "pending" | "accepted" | "rejected" | "cancelled" | "completed"
-            }));
-            
-          setBookings(pendingBookings as Booking[]);
+          // Set only pending bookings for display
+          setBookings(bookingsData.filter(b => b.status === 'pending'));
           
           // Calculate stats
           const activeRides = ridesData.filter(r => r.status === 'active').length;
