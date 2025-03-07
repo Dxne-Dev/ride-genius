@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { X, Menu, Car, User, Search, MapPin, LogOut, Ticket, ShieldCheck, UserCircle, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/auth';
 
 const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,21 +37,22 @@ const Navbar: React.FC = () => {
   // Liens pour les passagers
   const passengerNavLinks = [
     { name: "Rechercher", path: "/search", icon: <Search className="mr-2 h-4 w-4" /> },
-    { name: "Mes trajets", path: "/passenger/dashboard", icon: <Ticket className="mr-2 h-4 w-4" /> },
-    { name: "Comment ça marche", path: "/how-it-works", icon: <MapPin className="mr-2 h-4 w-4" /> },
+    { name: "Mes réservations", path: "/passenger/bookings", icon: <Ticket className="mr-2 h-4 w-4" /> },
+    { name: "Tableau de bord", path: "/passenger/dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
   ];
   
   // Liens pour les conducteurs
   const driverNavLinks = [
     { name: "Proposer", path: "/driver/offer", icon: <Car className="mr-2 h-4 w-4" /> },
-    { name: "Mes trajets", path: "/driver/dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
-    { name: "Comment ça marche", path: "/how-it-works", icon: <MapPin className="mr-2 h-4 w-4" /> },
+    { name: "Mes trajets", path: "/driver/rides", icon: <Ticket className="mr-2 h-4 w-4" /> },
+    { name: "Tableau de bord", path: "/driver/dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
   ];
   
   // Liens pour les administrateurs
   const adminNavLinks = [
-    { name: "Administration", path: "/admin/dashboard", icon: <ShieldCheck className="mr-2 h-4 w-4" /> },
-    { name: "Rechercher", path: "/search", icon: <Search className="mr-2 h-4 w-4" /> },
+    { name: "Tableau de bord", path: "/admin/dashboard", icon: <LayoutDashboard className="mr-2 h-4 w-4" /> },
+    { name: "Utilisateurs", path: "/admin/users", icon: <User className="mr-2 h-4 w-4" /> },
+    { name: "Trajets", path: "/admin/rides", icon: <Car className="mr-2 h-4 w-4" /> },
   ];
   
   // Sélectionner les liens en fonction du rôle
