@@ -8,7 +8,7 @@ import { SearchData } from '@/types';
 import { useAuth } from '@/context/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { Booking } from '@/types';
-import { CheckCircle, MapSearch, RefreshCcw, Route, Star } from 'lucide-react';
+import { CheckCircle, MapPin, RefreshCcw, Route, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import BookingCard from '@/components/bookings/BookingCard';
 import SearchForm from '@/components/search/SearchForm';
@@ -51,12 +51,22 @@ const PassengerDashboard = () => {
           
         if (bookingsError) throw bookingsError;
         
+        // Ensure type safety by casting each booking
+        const typedBookings = bookingsData.map(booking => ({
+          ...booking,
+          status: booking.status as "pending" | "accepted" | "rejected" | "cancelled" | "completed",
+          ride: booking.ride ? {
+            ...booking.ride,
+            status: booking.ride.status as "active" | "completed" | "cancelled"
+          } : undefined
+        }));
+        
         // Split into upcoming and past bookings
         const now = new Date();
         const upcoming: Booking[] = [];
         const past: Booking[] = [];
         
-        bookingsData.forEach(booking => {
+        typedBookings.forEach(booking => {
           if (!booking.ride) return;
           
           const departureTime = new Date(booking.ride.departure_time);
@@ -74,11 +84,11 @@ const PassengerDashboard = () => {
         setPastBookings(past);
         
         // Calculate stats
-        const totalBookings = bookingsData.length;
+        const totalBookings = typedBookings.length;
         const upcomingCount = upcoming.length;
-        const completedCount = bookingsData.filter(b => b.status === 'completed').length;
+        const completedCount = typedBookings.filter(b => b.status === 'completed').length;
         
-        const totalSpent = bookingsData
+        const totalSpent = typedBookings
           .filter(b => b.status === 'accepted' || b.status === 'completed')
           .reduce((sum, booking) => {
             const ridePrice = booking.ride?.price || 0;
