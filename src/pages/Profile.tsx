@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import { useAuth } from '@/context/auth';
+import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,8 @@ import { Loader2, User } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Profile = () => {
-  const { user, isLoading: authLoading, fetchUserProfile } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -20,7 +22,13 @@ const Profile = () => {
   const [email, setEmail] = useState('');
 
   useEffect(() => {
-    const loadProfile = async () => {
+    // Redirect if not logged in
+    if (!user && !authLoading) {
+      navigate('/login');
+      return;
+    }
+
+    const fetchProfile = async () => {
       if (!user) return;
       
       setIsLoading(true);
@@ -51,8 +59,8 @@ const Profile = () => {
       }
     };
 
-    loadProfile();
-  }, [user]);
+    fetchProfile();
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,9 +84,6 @@ const Profile = () => {
         .eq('id', user.id);
 
       if (error) throw error;
-      
-      // Refresh profile data in context
-      await fetchUserProfile();
       
       toast.success('Profil mis à jour avec succès');
     } catch (error: any) {

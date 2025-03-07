@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,14 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Calendar as CalendarIcon, Car, Clock, Euro, Users } from 'lucide-react';
+import { Calendar as CalendarIcon, Car, Clock, Euro, Users, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/auth';
+import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const Offer = () => {
-  const { user } = useAuth();
+const DriverOffer = () => {
+  const { user, profile, isLoading, isDriver } = useAuth();
   const navigate = useNavigate();
   
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -27,67 +27,95 @@ const Offer = () => {
   const [departure, setDeparture] = useState('');
   const [destination, setDestination] = useState('');
   const [price, setPrice] = useState('');
-  const [seats, setSeats] = useState('1');
+  const [seats, setSeats] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  
+  // Rediriger si ce n'est pas un conducteur
+  useEffect(() => {
+    if (!isLoading && user) {
+      if (!isDriver()) {
+        toast.error("Accès non autorisé. Vous devez être un conducteur pour proposer un trajet.");
+        navigate('/');
+      }
+    } else if (!isLoading && !user) {
+      navigate('/login');
+    }
+  }, [isLoading, user, isDriver, navigate]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) {
-      toast.error('Vous devez être connecté pour proposer un trajet');
+    if (!date) {
+      toast.error('Veuillez sélectionner une date');
       return;
     }
     
-    if (!date || !departureTime || !departure || !destination || !price || !seats) {
-      toast.error('Veuillez remplir tous les champs obligatoires');
+    if (!departureTime) {
+      toast.error('Veuillez indiquer une heure de départ');
+      return;
+    }
+    
+    if (!departure || !destination) {
+      toast.error('Veuillez indiquer un lieu de départ et d\'arrivée');
+      return;
+    }
+    
+    if (!price || !seats) {
+      toast.error('Veuillez indiquer un prix et le nombre de places disponibles');
       return;
     }
     
     setSubmitting(true);
     
     try {
-      // Format date and time
-      const departureDate = new Date(date);
+      // Création de la date de départ à partir de la date et de l'heure
       const [hours, minutes] = departureTime.split(':').map(Number);
-      departureDate.setHours(hours, minutes);
+      const departureDate = new Date(date);
+      departureDate.setHours(hours || 0, minutes || 0);
       
       const { data, error } = await supabase
         .from('rides')
         .insert({
-          driver_id: user.id,
+          driver_id: user?.id,
           departure,
           destination,
           departure_time: departureDate.toISOString(),
           price: parseFloat(price),
-          available_seats: parseInt(seats),
+          available_seats: parseInt(seats, 10),
           description: description || null,
           status: 'active'
         })
         .select();
-      
+        
       if (error) throw error;
       
       toast.success('Votre trajet a été enregistré avec succès !');
       
-      // Reset form
-      setDate(new Date());
-      setDepartureTime('');
-      setDeparture('');
-      setDestination('');
-      setPrice('');
-      setSeats('1');
-      setDescription('');
-      
-      // Redirect to driver dashboard
+      // Rediriger vers le tableau de bord du conducteur
       navigate('/driver/dashboard');
+      
     } catch (error: any) {
-      console.error('Error creating ride:', error);
+      console.error('Erreur lors de la création du trajet:', error);
       toast.error(error.message || 'Une erreur est survenue lors de la création du trajet');
     } finally {
       setSubmitting(false);
     }
   };
+  
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-20 flex items-center justify-center min-h-[80vh]">
+          <p>Chargement...</p>
+        </div>
+      </Layout>
+    );
+  }
+  
+  if (!user || !isDriver()) {
+    return null; // Will be redirected in useEffect
+  }
   
   return (
     <Layout>
@@ -178,7 +206,7 @@ const Offer = () => {
                         <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input 
                           id="departureTime" 
-                          type="time"
+                          placeholder="Exemple: 14:30" 
                           value={departureTime}
                           onChange={(e) => setDepartureTime(e.target.value)}
                           className="pl-10"
@@ -228,10 +256,10 @@ const Offer = () => {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description (facultatif)</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Décrivez votre trajet, vos conditions, etc."
+                  <Label htmlFor="description">Détails supplémentaires (facultatif)</Label>
+                  <Textarea 
+                    id="description" 
+                    placeholder="Informations complémentaires sur votre trajet : points de rendez-vous précis, bagages acceptés, etc." 
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={4}
@@ -243,7 +271,14 @@ const Offer = () => {
                   className="w-full bg-carpu-gradient hover:opacity-90 transition-opacity"
                   disabled={submitting}
                 >
-                  {submitting ? 'Enregistrement en cours...' : 'Proposer ce trajet'}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Enregistrement en cours...
+                    </>
+                  ) : (
+                    'Proposer ce trajet'
+                  )}
                 </Button>
               </form>
             </CardContent>
@@ -257,4 +292,4 @@ const Offer = () => {
   );
 };
 
-export default Offer;
+export default DriverOffer;
