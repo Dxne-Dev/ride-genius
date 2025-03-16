@@ -1,3 +1,4 @@
+
 <?php
 class Ride {
     private $conn;
@@ -57,18 +58,42 @@ class Ride {
     
     // Lire un trajet
     public function readOne() {
-        $query = "SELECT * FROM " . $this->table_name . " WHERE id = ?";
+        $query = "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as driver_name
+                FROM " . $this->table_name . " r
+                LEFT JOIN users u ON r.driver_id = u.id
+                WHERE r.id = ?";
         
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(1, $this->id);
         $stmt->execute();
         
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if($row) {
+            $this->driver_id = $row['driver_id'];
+            $this->departure = $row['departure'];
+            $this->destination = $row['destination'];
+            $this->departure_time = $row['departure_time'];
+            $this->available_seats = $row['available_seats'];
+            $this->price = $row['price'];
+            $this->status = $row['status'];
+            $this->description = $row['description'];
+            $this->created_at = $row['created_at'];
+            $this->driver_name = $row['driver_name'];
+            
+            return true;
+        }
+        
+        return false;
     }
     
-    // Lire tous les trajets
-    public function readAll() {
-        $query = "SELECT * FROM " . $this->table_name . " ORDER BY departure_time ASC";
+    // Lire tous les trajets actifs et à venir (avec le nom du conducteur)
+    public function read() {
+        $query = "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as driver_name
+                  FROM " . $this->table_name . " r
+                  LEFT JOIN users u ON r.driver_id = u.id
+                  WHERE r.status = 'active' AND r.departure_time > NOW()
+                  ORDER BY r.departure_time ASC";
         
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
@@ -156,20 +181,6 @@ class Ride {
         return false;
     }
     
-    // Lire tous les trajets (avec jointure pour obtenir le nom du conducteur)
-    public function read() {
-        $query = "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as driver_name
-                  FROM " . $this->table_name . " r
-                  LEFT JOIN users u ON r.driver_id = u.id
-                  WHERE r.status = 'active' AND r.departure_time > NOW()
-                  ORDER BY r.departure_time ASC";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute();
-        
-        return $stmt;
-    }
-    
     // Obtenir les trajets d'un conducteur
     public function getDriverRides() {
         $query = "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as driver_name
@@ -228,6 +239,19 @@ class Ride {
             $stmt->bindParam($paramIndex, $this->departure_time);
         }
         
+        $stmt->execute();
+        
+        return $stmt;
+    }
+    
+    // Lire tous les trajets (pour admin)
+    public function readAll() {
+        $query = "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as driver_name
+                  FROM " . $this->table_name . " r
+                  LEFT JOIN users u ON r.driver_id = u.id
+                  ORDER BY r.departure_time DESC";
+        
+        $stmt = $this->conn->prepare($query);
         $stmt->execute();
         
         return $stmt;

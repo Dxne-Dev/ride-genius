@@ -1,3 +1,4 @@
+
 <?php
 require_once 'models/Booking.php';
 require_once 'models/Ride.php';
@@ -18,16 +19,14 @@ class BookingController {
     // Créer une réservation
     public function create() {
         // Vérifier si l'utilisateur est connecté
-        if (!isset($_SESSION['user_id'])) {
+        if(!isset($_SESSION['user_id'])) {
             $_SESSION['error'] = "Vous devez être connecté pour réserver un trajet";
-            header("Location: index.php?page=login");
-            exit();
+            redirect('login');
         }
 
         // Vérifier si le formulaire a été soumis
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header("Location: index.php?page=rides");
-            exit();
+        if($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            redirect('rides');
         }
 
         // Récupérer les données du formulaire
@@ -36,50 +35,43 @@ class BookingController {
         $this->booking->seats = isset($_POST['seats']) ? $_POST['seats'] : 1;
 
         // Vérifier si l'utilisateur a déjà réservé ce trajet
-        if ($this->booking->checkExistingBooking()) {
+        if($this->booking->checkExistingBooking()) {
             $_SESSION['error'] = "Vous avez déjà réservé ce trajet";
-            header("Location: index.php?page=ride&id=" . $this->booking->ride_id);
-            exit();
+            redirect('ride&id=' . $this->booking->ride_id);
         }
 
         // Vérifier si le trajet existe et s'il reste des places disponibles
         $this->ride->id = $this->booking->ride_id;
-        $ride_data = $this->ride->readOne();
-        
-        if (!$ride_data) {
+        if(!$this->ride->readOne()) {
             $_SESSION['error'] = "Trajet introuvable";
-            header("Location: index.php?page=rides");
-            exit();
+            redirect('rides');
         }
 
-        if ($ride_data['available_seats'] < $this->booking->seats) {
+        if($this->ride->available_seats < $this->booking->seats) {
             $_SESSION['error'] = "Il ne reste pas assez de places disponibles";
-            header("Location: index.php?page=ride&id=" . $this->booking->ride_id);
-            exit();
+            redirect('ride&id=' . $this->booking->ride_id);
         }
 
         // Créer la réservation
-        if ($this->booking->create()) {
+        if($this->booking->create()) {
             // Mettre à jour le nombre de places disponibles
-            $this->ride->available_seats = $ride_data['available_seats'] - $this->booking->seats;
+            $this->ride->available_seats = $this->ride->available_seats - $this->booking->seats;
             $this->ride->updateAvailableSeats();
             
             $_SESSION['success'] = "Votre réservation a été effectuée avec succès";
-            header("Location: index.php?page=bookings");
+            redirect('bookings');
         } else {
             $_SESSION['error'] = "Une erreur s'est produite lors de la réservation";
-            header("Location: index.php?page=ride&id=" . $this->booking->ride_id);
+            redirect('ride&id=' . $this->booking->ride_id);
         }
-        exit();
     }
 
     // Afficher les réservations de l'utilisateur
     public function myBookings() {
         // Vérifier si l'utilisateur est connecté
-        if (!isset($_SESSION['user_id'])) {
+        if(!isset($_SESSION['user_id'])) {
             $_SESSION['error'] = "Vous devez être connecté pour voir vos réservations";
-            header("Location: index.php?page=login");
-            exit();
+            redirect('login');
         }
 
         $this->booking->passenger_id = $_SESSION['user_id'];
@@ -91,36 +83,36 @@ class BookingController {
     // Annuler une réservation
     public function cancel() {
         // Vérifier si l'utilisateur est connecté
-        if (!isset($_SESSION['user_id'])) {
+        if(!isset($_SESSION['user_id'])) {
             $_SESSION['error'] = "Vous devez être connecté pour annuler une réservation";
-            header("Location: index.php?page=login");
-            exit();
+            redirect('login');
         }
 
         // Vérifier si l'ID de la réservation est fourni
-        if (!isset($_GET['id'])) {
+        if(!isset($_GET['id'])) {
             $_SESSION['error'] = "Réservation introuvable";
-            header("Location: index.php?page=bookings");
-            exit();
+            redirect('bookings');
         }
 
         $this->booking->id = $_GET['id'];
-        $booking_data = $this->booking->readOne();
+        if(!$this->booking->readOne()) {
+            $_SESSION['error'] = "Réservation introuvable";
+            redirect('bookings');
+        }
 
-        // Vérifier si la réservation existe et appartient à l'utilisateur
-        if (!$booking_data || $booking_data['passenger_id'] != $_SESSION['user_id']) {
+        // Vérifier si l'utilisateur est le propriétaire de la réservation
+        if($this->booking->passenger_id != $_SESSION['user_id']) {
             $_SESSION['error'] = "Vous n'êtes pas autorisé à annuler cette réservation";
-            header("Location: index.php?page=bookings");
-            exit();
+            redirect('bookings');
         }
 
         // Annuler la réservation
         $this->booking->status = 'cancelled';
-        if ($this->booking->updateStatus()) {
+        if($this->booking->updateStatus()) {
             // Mettre à jour le nombre de places disponibles
-            $this->ride->id = $booking_data['ride_id'];
-            $ride_data = $this->ride->readOne();
-            $this->ride->available_seats = $ride_data['available_seats'] + $booking_data['seats'];
+            $this->ride->id = $this->booking->ride_id;
+            $this->ride->readOne();
+            $this->ride->available_seats = $this->ride->available_seats + $this->booking->seats;
             $this->ride->updateAvailableSeats();
 
             $_SESSION['success'] = "Votre réservation a été annulée avec succès";
@@ -128,41 +120,37 @@ class BookingController {
             $_SESSION['error'] = "Une erreur s'est produite lors de l'annulation";
         }
 
-        header("Location: index.php?page=bookings");
-        exit();
+        redirect('bookings');
     }
 
     // Afficher les réservations pour un trajet
     public function rideBookings() {
         // Vérifier si l'utilisateur est connecté
-        if (!isset($_SESSION['user_id'])) {
+        if(!isset($_SESSION['user_id'])) {
             $_SESSION['error'] = "Vous devez être connecté pour voir les réservations";
-            header("Location: index.php?page=login");
-            exit();
+            redirect('login');
         }
 
         // Vérifier si l'ID du trajet est fourni
-        if (!isset($_GET['id'])) {
+        if(!isset($_GET['id'])) {
             $_SESSION['error'] = "Trajet introuvable";
-            header("Location: index.php?page=rides");
-            exit();
+            redirect('my-rides');
         }
 
         $this->ride->id = $_GET['id'];
-        $ride_data = $this->ride->readOne();
+        if(!$this->ride->readOne()) {
+            $_SESSION['error'] = "Trajet introuvable";
+            redirect('my-rides');
+        }
 
-        // Vérifier si le trajet existe et appartient à l'utilisateur
-        if (!$ride_data || $ride_data['driver_id'] != $_SESSION['user_id']) {
+        // Vérifier si l'utilisateur est le propriétaire du trajet
+        if($this->ride->driver_id != $_SESSION['user_id']) {
             $_SESSION['error'] = "Vous n'êtes pas autorisé à voir ces réservations";
-            header("Location: index.php?page=rides");
-            exit();
+            redirect('my-rides');
         }
 
         $this->booking->ride_id = $this->ride->id;
         $bookings = $this->booking->readRideBookings();
-
-        // Récupérer les détails du trajet pour affichage
-        $this->ride->driver_name = $ride_data['driver_name'] ?? '';
 
         include "views/bookings/ride_bookings.php";
     }
@@ -170,29 +158,31 @@ class BookingController {
     // Afficher les détails d'une réservation
     public function show() {
         // Vérifier si l'utilisateur est connecté
-        if (!isset($_SESSION['user_id'])) {
+        if(!isset($_SESSION['user_id'])) {
             $_SESSION['error'] = "Vous devez être connecté pour voir cette réservation";
-            header("Location: index.php?page=login");
-            exit();
+            redirect('login');
         }
 
         // Vérifier si l'ID de la réservation est fourni
-        if (!isset($_GET['id'])) {
+        if(!isset($_GET['id'])) {
             $_SESSION['error'] = "Réservation introuvable";
-            header("Location: index.php?page=bookings");
-            exit();
+            redirect('bookings');
         }
 
         $this->booking->id = $_GET['id'];
-        $booking_data = $this->booking->readOne();
+        if(!$this->booking->readOne()) {
+            $_SESSION['error'] = "Réservation introuvable";
+            redirect('bookings');
+        }
 
-        // Vérifier si la réservation existe et est liée à l'utilisateur
-        if (!$booking_data || 
-            ($booking_data['passenger_id'] != $_SESSION['user_id'] && 
-             $booking_data['driver_id'] != $_SESSION['user_id'])) {
+        // Récupérer les détails du trajet
+        $this->ride->id = $this->booking->ride_id;
+        $this->ride->readOne();
+
+        // Vérifier si l'utilisateur est le passager ou le conducteur
+        if($this->booking->passenger_id != $_SESSION['user_id'] && $this->ride->driver_id != $_SESSION['user_id']) {
             $_SESSION['error'] = "Vous n'êtes pas autorisé à voir cette réservation";
-            header("Location: index.php?page=bookings");
-            exit();
+            redirect('bookings');
         }
 
         include "views/bookings/show.php";
@@ -201,54 +191,57 @@ class BookingController {
     // Mettre à jour le statut d'une réservation
     public function updateStatus() {
         // Vérifier si l'utilisateur est connecté
-        if (!isset($_SESSION['user_id'])) {
+        if(!isset($_SESSION['user_id'])) {
             $_SESSION['error'] = "Vous devez être connecté pour gérer les réservations";
-            header("Location: index.php?page=login");
-            exit();
+            redirect('login');
         }
 
         // Vérifier si les données sont fournies
-        if (!isset($_GET['id']) || !isset($_GET['status'])) {
+        if(!isset($_GET['id']) || !isset($_GET['status'])) {
             $_SESSION['error'] = "Données manquantes";
-            header("Location: index.php?page=bookings");
-            exit();
+            redirect('my-rides');
         }
 
         $this->booking->id = $_GET['id'];
-        $booking_data = $this->booking->readOne();
-
-        // Vérifier si la réservation existe
-        if (!$booking_data) {
+        if(!$this->booking->readOne()) {
             $_SESSION['error'] = "Réservation introuvable";
-            header("Location: index.php?page=bookings");
-            exit();
+            redirect('my-rides');
         }
 
         // Récupérer les détails du trajet
-        $this->ride->id = $booking_data['ride_id'];
-        $ride_data = $this->ride->readOne();
+        $this->ride->id = $this->booking->ride_id;
+        $this->ride->readOne();
 
         // Vérifier si l'utilisateur est le conducteur du trajet
-        if ($ride_data['driver_id'] != $_SESSION['user_id']) {
+        if($this->ride->driver_id != $_SESSION['user_id']) {
             $_SESSION['error'] = "Vous n'êtes pas autorisé à gérer cette réservation";
-            header("Location: index.php?page=bookings");
-            exit();
+            redirect('my-rides');
         }
 
-        $valid_statuses = ['accepted', 'rejected', 'cancelled'];
-        if (!in_array($_GET['status'], $valid_statuses)) {
+        $valid_statuses = ['accepted', 'rejected', 'completed'];
+        if(!in_array($_GET['status'], $valid_statuses)) {
             $_SESSION['error'] = "Statut invalide";
-            header("Location: index.php?page=ride-bookings&id=" . $booking_data['ride_id']);
-            exit();
+            redirect('ride-bookings&id=' . $this->booking->ride_id);
         }
 
+        // Si on accepte une réservation, vérifier qu'il reste des places
+        if($_GET['status'] === 'accepted' && $this->booking->status !== 'accepted') {
+            $booked_seats = $this->booking->countAcceptedBookings();
+            if($booked_seats + $this->booking->seats > $this->ride->available_seats) {
+                $_SESSION['error'] = "Il ne reste pas assez de places disponibles";
+                redirect('ride-bookings&id=' . $this->booking->ride_id);
+            }
+        }
+
+        // Mettre à jour le statut
+        $old_status = $this->booking->status;
         $this->booking->status = $_GET['status'];
         
-        // Mettre à jour le statut
-        if ($this->booking->updateStatus()) {
+        if($this->booking->updateStatus()) {
             // Si la réservation est annulée ou rejetée, mettre à jour le nombre de places disponibles
-            if ($this->booking->status === 'rejected' || $this->booking->status === 'cancelled') {
-                $this->ride->available_seats = $ride_data['available_seats'] + $booking_data['seats'];
+            if(($old_status === 'accepted' && $this->booking->status === 'rejected') || 
+               ($old_status === 'accepted' && $this->booking->status === 'cancelled')) {
+                $this->ride->available_seats = $this->ride->available_seats + $this->booking->seats;
                 $this->ride->updateAvailableSeats();
             }
             
@@ -257,18 +250,6 @@ class BookingController {
             $_SESSION['error'] = "Une erreur s'est produite lors de la mise à jour du statut";
         }
 
-        header("Location: index.php?page=ride-bookings&id=" . $booking_data['ride_id']);
-        exit();
-    }
-    
-    // Méthode pour vérifier si un utilisateur a déjà réservé ce trajet
-    // Cette méthode est appelée dans le contrôleur RideController
-    public function checkExistingBooking() {
-        // Vérifier si les données nécessaires sont définies
-        if (empty($this->booking->ride_id) || empty($this->booking->passenger_id)) {
-            return false;
-        }
-        
-        return $this->booking->hasBooking();
+        redirect('ride-bookings&id=' . $this->booking->ride_id);
     }
 }
