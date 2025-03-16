@@ -34,11 +34,12 @@ const DriverDashboard = () => {
           
         if (error) throw error;
         
-        // Convert string prices to numbers if needed
+        // Convert string prices to numbers if needed and ensure status type
         const formattedRides = data.map(ride => ({
           ...ride,
-          price: typeof ride.price === 'string' ? parseFloat(ride.price) : ride.price
-        }));
+          price: typeof ride.price === 'string' ? parseFloat(ride.price) : ride.price,
+          status: ride.status as 'active' | 'completed' | 'cancelled'
+        })) as Ride[];
         
         setRides(formattedRides);
         
@@ -51,7 +52,15 @@ const DriverDashboard = () => {
             .in('ride_id', rideIds);
             
           if (bookingsError) throw bookingsError;
-          setBookings(bookingsData);
+          
+          // Ensure booking status type
+          const typedBookings = bookingsData.map(booking => ({
+            ...booking,
+            status: booking.status as 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'completed',
+            passenger: booking.profiles
+          })) as Booking[];
+          
+          setBookings(typedBookings);
         }
       } catch (error) {
         console.error('Error fetching rides:', error);

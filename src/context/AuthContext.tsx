@@ -1,10 +1,12 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { UserProfile, UserRole } from '@/types/models';
+
+// Export UserRole from models to make it available
+export { UserRole } from '@/types/models';
 
 type AuthContextType = {
   user: User | null;
