@@ -13,6 +13,7 @@ class Ride {
     public $status;
     public $description;
     public $created_at;
+    public $driver_name;
     
     public function __construct($db) {
         $this->conn = $db;
@@ -153,5 +154,82 @@ class Ride {
         }
         
         return false;
+    }
+    
+    // Lire tous les trajets (avec jointure pour obtenir le nom du conducteur)
+    public function read() {
+        $query = "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as driver_name
+                  FROM " . $this->table_name . " r
+                  LEFT JOIN users u ON r.driver_id = u.id
+                  WHERE r.status = 'active' AND r.departure_time > NOW()
+                  ORDER BY r.departure_time ASC";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        
+        return $stmt;
+    }
+    
+    // Obtenir les trajets d'un conducteur
+    public function getDriverRides() {
+        $query = "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as driver_name
+                  FROM " . $this->table_name . " r
+                  LEFT JOIN users u ON r.driver_id = u.id
+                  WHERE r.driver_id = ?
+                  ORDER BY r.departure_time DESC";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(1, $this->driver_id);
+        $stmt->execute();
+        
+        return $stmt;
+    }
+    
+    // Rechercher des trajets
+    public function search() {
+        $query = "SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as driver_name
+                  FROM " . $this->table_name . " r
+                  LEFT JOIN users u ON r.driver_id = u.id
+                  WHERE r.status = 'active' 
+                  AND r.departure_time > NOW()";
+        
+        // Ajout des critères de recherche si présents
+        if (!empty($this->departure)) {
+            $query .= " AND r.departure LIKE ?";
+            $this->departure = "%" . $this->departure . "%";
+        }
+        
+        if (!empty($this->destination)) {
+            $query .= " AND r.destination LIKE ?";
+            $this->destination = "%" . $this->destination . "%";
+        }
+        
+        if (!empty($this->departure_time)) {
+            $query .= " AND DATE(r.departure_time) = ?";
+        }
+        
+        $query .= " ORDER BY r.departure_time ASC";
+        
+        $stmt = $this->conn->prepare($query);
+        
+        // Lier les paramètres si présents
+        $paramIndex = 1;
+        if (!empty($this->departure)) {
+            $stmt->bindParam($paramIndex, $this->departure);
+            $paramIndex++;
+        }
+        
+        if (!empty($this->destination)) {
+            $stmt->bindParam($paramIndex, $this->destination);
+            $paramIndex++;
+        }
+        
+        if (!empty($this->departure_time)) {
+            $stmt->bindParam($paramIndex, $this->departure_time);
+        }
+        
+        $stmt->execute();
+        
+        return $stmt;
     }
 }
