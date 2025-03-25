@@ -19,6 +19,7 @@ import Cookies from "./pages/Cookies";
 import Legal from "./pages/Legal";
 import Help from "./pages/Help";
 import Rides from "./pages/Rides";
+import PassengerDashboard from "./pages/passenger/Dashboard";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/passenger/dashboard" element={<PassengerDashboard />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/cookies" element={<Cookies />} />
