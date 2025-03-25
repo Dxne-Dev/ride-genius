@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -6,7 +7,8 @@ import { toast } from 'sonner';
 import { UserProfile, UserRole } from '@/types/models';
 
 // Export UserRole from models to make it available
-export { UserRole } from '@/types/models';
+// Fix: Use 'export type' instead of just 'export' to avoid TS1205 error
+export type { UserRole } from '@/types/models';
 
 type AuthContextType = {
   user: User | null;
